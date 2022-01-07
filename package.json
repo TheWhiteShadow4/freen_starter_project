@@ -1,0 +1,28 @@
+{
+	"name": "freen_starter_project",
+	"version": "0.0.1",
+	"description": "Freen Starter Project",
+	"scripts": {
+		"build": "node build.js src/init.lua"
+	},
+	"homepage": "https://github.com/TheWhiteShadow4/freen_starter_project",
+	
+	"author": "your cat",
+	"license": "ISC",
+	
+	"dependencies": {
+		"luabundle": "^1.6.0",
+		"luamin": "^1.0.4",
+		"node-watch": "^0.7.2"
+	},
+	"build": {
+		"main": "init.lua",
+		"bundle": "bundle.lua",
+		"metadata": false,
+		"minify": false,
+		"watch": true,
+		"libs": [
+			"libs"
+		]
+	}
+}
