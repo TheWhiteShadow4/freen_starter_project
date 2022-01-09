@@ -40,6 +40,7 @@ function defineClass(spec, init)
 	-- Instanzierungs Funktion für neue Objekte
 	cls.instantiate = function(...)
 		local obj = {}
+		obj.hash = hash()
 		setmetatable(obj,c)
 		if base then
 			local parent = base
@@ -51,7 +52,6 @@ function defineClass(spec, init)
 		return obj
 	end
 	-- Basis Funktionen jeder Klasse
-	c.hash = hash()
 	c.getHash = function() return c.hash end
 	c.getType = function() return cls end
 	if type(spec.aliase) == 'table' then
@@ -134,20 +134,19 @@ _Component = defineClass({}, function(p)
 	p.id = newUID()
 end)
 
-function _Component:__tostring() return self.id end
+function _Component:__tostring()
+	if self:getType() ~= nil then
+		return self:getType().name..' '..self.id
+	else
+		return self.id
+	end
+end
 
 --- Erstellt ein Array mit einer neuen virtuellen Netzwerk Komponente mit zufällig generierter Id.
 --- Die so erstellte Komponente wird dem Netzwerk hinzugefügt.
-function componentFactory(query, nick)
+function componentFactory(cls, nick)
 	-- Komponente erstellen und ins Netzwerk einfügen.
-	local comp
-	if getmetatable(query) == Class then
-		comp = query:instantiate()
-	elseif classes[query] ~= nil then
-		comp = classes[query].instantiate()
-	else
-		comp = _Component.getType().instantiate()
-	end
+	local comp = cls:instantiate()
 	for i,v in pairs(Actor) do
 		comp[i] = v
 	end
@@ -158,11 +157,10 @@ function componentFactory(query, nick)
 		if ALIASES[nick] == nil then ALIASES[nick] = {} end
 		table.insert(ALIASES[nick], comp)
 	end
-	return comp.id
+	return comp
 end
 
 computer = {
-	--getInstance = function() end,
 	beep = function(pitch) end,
 	stop = function() os.exit() end,
 	panic = function(error)
@@ -176,10 +174,10 @@ computer = {
 	time = function() return 0 end,
 	millis = function() return os.clock() end,
 	getPCIDevices = function(type)
-		if type == nil then return {} end
-		cls = classes[type.name] 
-		if cls == nil then return {} end
-		return lazyArray(cls.instantiate)
+		if not typeof(type, Class) then error("Instance is invalid", 2) end
+		cls = classes[type.name]
+		if cls == nil then error("Instance is invalid", 2) end
+		return lazyArray(componentFactory, cls, nil)
 	end
 }
 
@@ -192,7 +190,7 @@ component = {
 			end
 			return ret
 		else
-			if type(ids) ~= "string" then error("id is not a string") end
+			if type(ids) ~= "string" then error("id is not a string", 2) end
 			return Network[ids]
 		end
 	end,
@@ -209,8 +207,12 @@ component = {
 			return ids
 		elseif query == "" then
 			return table_keys(Network)
+		elseif getmetatable(query) == Class then
+			return lazyArray(function(...)
+					return componentFactory(...).id
+				end, query, nil)
 		else
-			return lazyArray(componentFactory, query, nil)
+			return {}
 		end
 	end
 }
@@ -218,15 +220,17 @@ component = {
 local LISTENING = {}
 local EVENT_QUEUE = {}
 
-function queueEvent(evt, comp, ...)
-	table.insert(EVENT_QUEUE, {evt, comp, ...})
+function queueEvent(evt)
+	table.insert(EVENT_QUEUE, evt)
 end
 
 event = {
 	listen = function(comp)
 		if comp.id == nil then error("Invalid component") end
-		comp._fire = function(c, evt, ...)
-			queueEvent(evt, c, ...)
+		comp._fire = function(self, evt, ...)
+			print("fire", self, evt, ...)
+			if type(evt) ~= "string" then error("Event type must be a string!") end
+			queueEvent({evt, self, ...})
 		end
 		LISTENING[comp.id] = comp
 	end,
@@ -451,6 +455,44 @@ FINComputerScreen = defineClass({
 	aliase = {"Build_Screen_C", "Screen"},
 	displayName = "Large Screen"
 })
+
+NetworkCard = defineClass({
+	base = _Component,
+	aliase = {"NetworkCard_C", "NetworkCard"},
+	displayName = "NetworkCard"
+}, function (p)
+	addNetworkComponent(p)
+end)
+
+function NetworkCard:open(port)
+
+end
+
+function NetworkCard:close(port)
+
+end
+
+function NetworkCard:closeAll()
+
+end
+
+function NetworkCard:send(rec, port, ...)
+	if rec == nil then error("reciever is nil") end
+	-- Erstelle direkt ein Event beim Empfänger.
+	if LISTENING[rec] ~= nil then
+		queueEvent({"NetworkMessage", Network[rec], self, self.id, port, ...})
+	end
+end
+
+function NetworkCard:broadcast(port, ...)
+	for id,c in pairs(Network) do
+		if c:getType().name == "NetworkCard_C" then
+			if LISTENING[id] ~= nil then
+				queueEvent({"NetworkMessage", c, self, self.id, port, ...})
+			end
+		end
+	end
+end
 
 Powerpol = defineClass({
 	base = _Component,
