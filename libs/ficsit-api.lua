@@ -172,7 +172,7 @@ computer = {
 	getEEPROM = function() end,
 	setEEPROM = function(code) end,
 	time = function() return 0 end,
-	millis = function() return os.clock() end,
+	millis = function() return os.clock()*1000.0 end,
 	getPCIDevices = function(type)
 		if not typeof(type, Class) then error("Instance is invalid", 2) end
 		cls = classes[type.name]
@@ -477,18 +477,20 @@ function NetworkCard:closeAll()
 end
 
 function NetworkCard:send(rec, port, ...)
-	if rec == nil then error("reciever is nil") end
+	if rec == nil then error("reciever is nil", 2) end
+	if port > 10000 then print("Warning! unsafe port number", 2) end
 	-- Erstelle direkt ein Event beim Empfänger.
 	if LISTENING[rec] ~= nil then
-		queueEvent({"NetworkMessage", Network[rec], self, self.id, port, ...})
+		queueEvent({"NetworkMessage", Network[rec], self.id, port, ...})
 	end
 end
 
 function NetworkCard:broadcast(port, ...)
+	if port > 10000 then print("Warning! unsafe port number", 2) end
 	for id,c in pairs(Network) do
 		if c:getType().name == "NetworkCard_C" then
 			if LISTENING[id] ~= nil then
-				queueEvent({"NetworkMessage", c, self, self.id, port, ...})
+				queueEvent({"NetworkMessage", c, self.id, port, ...})
 			end
 		end
 	end
